@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Prototipo Chat Alimentación Saludable</title>
+  <style>
+    /* 🚨 COLOR DE ACENTO RESTAURADO AL VERDE WHATSAPP (#075E54) */
+    :root{--bg:#e5ddd5;--left:#fff;--right:#dcf8c6;--accent:#075E54} 
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, Arial}
+    .wrap{display:flex;justify-content:center;align-items:center;height:100%;background:#eaeaea}
+    .phone{width:360px;height:700px;background:#fff;border-radius:20px;box-shadow:0 8px 30px rgba(0,0,0,.15);overflow:hidden;display:flex;flex-direction:column}
+    .header{background:var(--accent);color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px}
+    .header .avatar{width:40px;height:40px;border-radius:50%;background:#0b7a63}
+    .header .title{font-weight:600}
+    .chat{flex:1;padding:14px;overflow:auto;background:var(--bg)}
+
+    /* ESTILOS CLAVE */
+    .bubble{
+      max-width:78%;
+      padding:8px 12px;
+      border-radius:14px;
+      margin:8px 0;
+      display:inline-block; 
+      white-space: pre-wrap; 
+      word-wrap: break-word;
+      overflow: hidden; 
+    }
+
+    .bubble img {
+        width: 100%; 
+        height: auto; 
+        display: block; 
+        border-radius: 14px; 
+    }
+    
+    /* Estilo para links dentro de la burbuja */
+    .bubble a {
+        color: #128c7e; /* Tono de verde de link de WhatsApp */
+        text-decoration: underline;
+        font-weight: 500;
+    }
+
+    .left{background:var(--left);border-top-left-radius:4px}
+    .right{background:var(--right);margin-left:auto;border-top-right-radius:4px}
+    .meta{font-size:11px;color:#555;margin-top:6px;text-align:right}
+    .composer{display:flex;padding:10px;border-top:1px solid #ddd;gap:8px}
+    .composer input{flex:1;padding:10px;border-radius:999px;border:1px solid #ddd}
+    .composer button{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="phone">
+      <div class="header">
+        <div class="avatar"></div>
+        <div>
+          <div class="title">Viandas Saludables</div>
+          <div class="small">Asistente de Pedidos 🤖</div>
+        </div>
+      </div>
+
+      <div id="chat" class="chat" aria-live="polite"></div>
+
+      <form id="form" class="composer" onsubmit="return false;">
+        <input id="inputMessage" placeholder="Pregunta sobre viandas, menú, o promociones..." autocomplete="off" />
+        <button id="sendBtn" type="submit">Enviar</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:3002/api/message'; 
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('inputMessage');
+    const form = document.getElementById('form');
+
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m]}); }
+
+    // FUNCIÓN CRÍTICA PARA HTML Y LINKS (Ya maneja objetos de texto e imagen)
+    function pushBubble(content, who='left', meta=''){
+        const div = document.createElement('div');
+        div.className = 'bubble ' + (who==='me' ? 'right' : 'left');
+
+        let htmlContent = '';
+        let hasImage = false;
+        let hasText = false;
+
+        if (typeof content === 'object') {
+            if (content.image) {
+                hasImage = true;
+                htmlContent += `<img src="${content.image}" alt="Imagen sugerida">`;
+            }
+            if (content.text && content.text.trim() !== '') {
+                hasText = true;
+                
+                // Si el texto contiene el tag de link, lo renderizamos como HTML.
+                const textIsLink = content.text.includes('<a href="');
+                const textToRender = textIsLink ? content.text : escapeHtml(content.text);
+                
+                htmlContent += `<div>${textToRender}</div>`;
+            }
+        } else {
+            hasText = true;
+            htmlContent += `<div>${escapeHtml(content)}</div>`;
+        }
+        
+        if (hasImage && !hasText) {
+            div.classList.add('image-only');
+        }
+
+        div.innerHTML = htmlContent + (meta ? `<div class="meta">${meta}</div>` : ''); 
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function sendMessage(text){
+      if(!text.trim()) return;
+      pushBubble(text,'me',new Date().toLocaleTimeString('es-AR')); 
+      input.value = '';
+      try{
+        const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: text})
+        });
+        
+        const { responses } = await resp.json(); 
+
+        await new Promise(r => setTimeout(r, 800)); 
+        
+        // Itera sobre el arreglo de respuestas (permite texto y foto en secuencia)
+        for (const responseItem of responses) {
+            pushBubble(responseItem, 'bot', new Date().toLocaleTimeString('es-AR'));
+            await new Promise(r => setTimeout(r, 500)); 
+        }
+
+      } catch (error) {
+        console.error('Error al comunicarse con el servidor:', error);
+        pushBubble('⚠️ Error de conexión con el bot. Asegúrate de que el servidor de alimentos esté corriendo en el puerto 3002.', 'bot');
+      }
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      sendMessage(input.value);
+    });
+
+    // 🚨 Mensaje de bienvenida inicial CON ICONOS 📲🤖
+    pushBubble(" ¡Hola! 📲🤖 Soy tu Asistente SmartWA de Viandas Saludables. Preguntame por 'menú', 'promociones' u 'horarios'.", 'bot');
+  </script>
+</body>
+</html>
