@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultor de IA para Emprendedores</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.0.10/marked.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #e5ddd5; /* Fondo más neutro tipo WhatsApp */ }
+        /* 🟢 CORRECCIÓN FINAL: Tamaño exacto de celular (360px) */
+        .chat-container { height: 90vh; max-width: 360px; margin: 2rem auto; } 
+        .chat-messages { overflow-y: auto; height: calc(100% - 7rem); }
+        
+        /* Estilos de burbuja de chat - ESTILO WHATSAPP */
+        /* Color del bot (Burbuja izquierda: Verde claro) */
+        .bot-message { background-color: #dcf8c6; border-radius: 12px 12px 12px 4px; color: #1f2937; } 
+        /* Color del usuario (Burbuja derecha: Blanco/Gris muy claro) */
+        .user-message { background-color: #ffffff; border-radius: 12px 12px 4px 12px; color: #1f2937; border: 1px solid #f0f0f0; } 
+        
+        /* 🟢 NUEVO: Estilos para enlaces dentro de las burbujas del bot */
+        .bot-message a {
+            color: #1d90f5; /* Azul/Celeste claro */
+            text-decoration: underline;
+            font-weight: 600; 
+        }
+
+        .bot-bubble { max-width: 85%; }
+        .user-bubble { max-width: 85%; float: right; }
+        
+        /* Estilos del Header - Verde WhatsApp */
+        .header-bg { background-color: #075e54; } 
+
+        /* Estilos específicos para la imagen */
+        .bot-image { max-width: 256px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); margin-top: 4px; }
+        
+        /* Animación de carga (Loading) */
+        .dot-pulse { display: flex; align-items: center; }
+        .dot { width: 8px; height: 8px; margin: 0 4px; background-color: #4ade80; /* Verde brillante */ border-radius: 50%; animation: pulse 1.5s infinite ease-in-out; }
+        .dot:nth-child(2) { animation-delay: 0.3s; }
+        .dot:nth-child(3) { animation-delay: 0.6s; }
+        @keyframes pulse { 0%, 100% { opacity: 0.2; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="p-4">
+    <div class="chat-container flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden">
+        
+        <header class="p-4 header-bg text-white shadow-lg flex items-center rounded-t-xl">
+            <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.518 23.518 0 0112 15c-3.185 0-6.279-.602-9-1.745M16 4h2a2 2 0 012 2v1a2 2 0 01-2 2h-2m0 0l-1 1m-4-4h2a2 2 0 012 2v1a2 2 0 01-2 2h-2m0 0l-1 1m-4-4h2a2 2 0 012 2v1a2 2 0 01-2 2H8m0 0l-1 1m-4-4h2a2 2 0 012 2v1a2 2 0 01-2 2H4m0 0l-1 1M3 21v-4m2-4v4m2-4v4m2-4v4m2-4v4m2-4v4m2-4v4m2-4v4m2-4v4m2-4v4"></path></svg>
+            <h1 class="text-lg font-semibold">Consultor de IA para Emprendedores</h1>
+        </header>
+
+        <div id="messages" class="chat-messages p-4 flex-grow space-y-4">
+            <div class="flex justify-start">
+                <div class="bot-bubble p-3 shadow-md bot-message">
+                    <div id="initial-message">
+                        </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-gray-200">
+            <form id="chat-form" class="flex space-x-3">
+                <input type="text" id="user-input" placeholder="Escribe tu consulta o una opción (1, 2, 3...)" 
+                        class="flex-grow p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-600 focus:border-green-600">
+                <button type="submit" id="send-button"
+                        class="px-5 py-3 bg-green-600 text-white font-medium rounded-xl hover:bg-green-700 transition duration-150 ease-in-out shadow-md disabled:opacity-50">
+                    Enviar
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const messagesContainer = document.getElementById('messages');
+        const sendButton = document.getElementById('send-button');
+        const apiUrl = 'http://localhost:3003/api/message';
+
+        // 🛑 MENSAJE DE BIENVENIDA ACTUALIZADO con \n\n para mejor formato Markdown
+        const WELCOME_MESSAGE = `¡Hola, Emprendedor/ar! 👋 Soy tu Consultor de IA. Preguntame sobre trámites clave o selecciona una opción del menú:
+        
+1️⃣ **¿Qué es IVA?**
+
+2️⃣ **¿Cómo crear una empresa?**
+
+3️⃣ **Requisitos para estar dado de alta como autónomo.**
+        
+También puedes hacer una **Consulta libre** (ej: **'¿Cómo registro mi marca?'** o **'diseño de marca'**).`;
+
+        document.getElementById('initial-message').innerHTML = marked.parse(WELCOME_MESSAGE);
+
+
+        // Función para renderizar el mensaje del bot (maneja texto y URL)
+        function renderBotMessage(message) {
+            const messageElement = document.createElement('div');
+            messageElement.className = 'flex justify-start';
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bot-bubble p-3 shadow-md bot-message';
+            
+            // 🛑 Lógica para manejar si es texto (text) o una URL de imagen (url)
+            if (message.url) {
+                // Si tiene 'url', muestra la imagen
+                const img = document.createElement('img');
+                img.src = message.url;
+                // Añade un manejador de error simple en caso de que la URL de la imagen falle
+                img.onerror = () => img.alt = 'No se pudo cargar la imagen de inspiración.';
+                img.className = 'bot-image';
+                bubble.appendChild(img);
+                // Además, quitamos el padding y fondo de la burbuja para la imagen
+                bubble.classList.remove('p-3', 'bot-message');
+                bubble.classList.add('p-0', 'bg-transparent', 'shadow-none');
+            } else {
+                // Si tiene 'text', procesa el markdown y lo muestra
+                bubble.innerHTML = marked.parse(message.text);
+            }
+            
+            messageElement.appendChild(bubble);
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Función para renderizar el mensaje del usuario
+        function renderUserMessage(text) {
+            const messageElement = document.createElement('div');
+            messageElement.className = 'flex justify-end';
+            messageElement.innerHTML = `
+                <div class="user-bubble p-3 shadow-md user-message">
+                    ${text}
+                </div>
+            `;
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Función para mostrar el indicador de carga del bot
+        function showLoading() {
+            const loadingElement = document.createElement('div');
+            loadingElement.id = 'loading-indicator';
+            loadingElement.className = 'flex justify-start';
+            loadingElement.innerHTML = `
+                <div class="bot-bubble p-3 shadow-md bg-gray-100 text-gray-500 rounded-xl">
+                    <div class="dot-pulse">
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                </div>
+            `;
+            messagesContainer.appendChild(loadingElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            sendButton.disabled = true;
+            userInput.disabled = true;
+        }
+
+        // Función para ocultar el indicador de carga
+        function hideLoading() {
+            const loadingElement = document.getElementById('loading-indicator');
+            if (loadingElement) {
+                loadingElement.remove();
+            }
+            sendButton.disabled = false;
+            userInput.disabled = false;
+            userInput.focus();
+        }
+
+        // Función para manejar el envío de mensajes
+        async function sendMessage(e) {
+            e.preventDefault();
+            const message = userInput.value.trim();
+
+            if (!message) return;
+
+            renderUserMessage(message);
+            userInput.value = '';
+            showLoading();
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Muestra cada mensaje del bot secuencialmente
+                for (let i = 0; i < data.responses.length; i++) {
+                    // Espera un breve momento entre mensajes, excepto si es el primero
+                    if (i > 0) {
+                        await new Promise(resolve => setTimeout(resolve, 500)); 
+                    }
+                    renderBotMessage(data.responses[i]);
+                }
+
+            } catch (error) {
+                console.error('Error al enviar el mensaje:', error);
+                renderBotMessage({ text: `❌ Hubo un error de conexión con el Consultor. Por favor, verifica que el Canvas de backend esté corriendo en el puerto 3003. (${error.message})` });
+            } finally {
+                hideLoading();
+            }
+        }
+
+        chatForm.addEventListener('submit', sendMessage);
+    </script>
+</body>
+</html>
