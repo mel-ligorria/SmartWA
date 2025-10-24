@@ -1,6 +1,11 @@
 # SmartWA
 Este proyecto forma parte del Aprendizaje Basado en Proyectos (ABP) de las materia:  Práctica Profesionalizante de la carrera: Tecnicatura Superior en Ciencia de Datos e Inteligencia Artificial
 
+*SmartWA: Smart WhatsApp Assistant*
+
+_Una solución innovadora basada en Inteligencia Artificial Generativa_
+
+Nuestro objetivo es resolver los desafíos de tiempo, organización y atención al cliente que enfrentan emprendedores y pequeños negocios al usar WhatsApp Business.
 
 Acceso a la evidencia nº 3: https://gamma.app/docs/SMARTWA-Demo-funcional-1cdrweh8zfd4v74 
 
